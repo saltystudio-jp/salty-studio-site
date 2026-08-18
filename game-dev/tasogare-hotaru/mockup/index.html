@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>たそがれホタル | デジタルモック</title>
+<meta name="description" content="SALTY STUDIO新作企画『たそがれホタル』の簡易デジタルモック。盤面と駒の動きを確認できます。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --dusk-900:#241b3f;
+    --dusk-800:#2f2557;
+    --dusk-700:#3f3270;
+    --dusk-500:#5c4b98;
+    --paper:#fbf4e6;
+    --coral:#f2795c;
+    --teal:#0d3538;
+    --gold:#ffd166;
+    --mint:#8bd17c;
+    --sky:#6fb8f2;
+    --ink:#241b3f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Zen Kaku Gothic New", sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(60% 50% at 15% 10%, rgba(255,209,102,0.35), transparent 60%),
+      radial-gradient(50% 45% at 90% 15%, rgba(111,184,242,0.30), transparent 60%),
+      radial-gradient(70% 60% at 50% 100%, rgba(143,127,209,0.35), transparent 60%),
+      linear-gradient(180deg, #fbf4e6 0%, #f3e9d6 100%);
+    min-height:100vh;
+  }
+  h1,h2,h3{ font-family:"Shippori Mincho", serif; margin:0; }
+  .wrap{ max-width:1080px; margin:0 auto; padding:20px 16px 60px; }
+  header.app-header{
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    padding:14px 20px; border-radius:16px;
+    background:linear-gradient(120deg, var(--teal), #124042);
+    color:#fbf4e6; margin-bottom:18px;
+    box-shadow:0 10px 24px rgba(13,53,56,0.25);
+  }
+  header.app-header .title{ font-size:1.4rem; letter-spacing:.02em; }
+  header.app-header .subtitle{ font-size:.75rem; opacity:.8; }
+
+  .layout{ display:grid; grid-template-columns: 1fr 280px; gap:20px; }
+  @media (max-width: 860px){ .layout{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background: rgba(255,255,255,0.75);
+    border-radius:18px;
+    padding:16px;
+    box-shadow: 0 8px 22px rgba(36,27,63,0.10);
+    border: 1px solid rgba(255,255,255,0.6);
+  }
+
+  .board-panel{ position:relative; overflow:hidden; }
+  .board-panel.twilight{ background: linear-gradient(180deg, #1a1330, #100b22); }
+
+  .dusk-track{ display:flex; align-items:center; gap:6px; margin-bottom:14px; }
+  .dusk-track .label{ font-size:.75rem; opacity:.75; margin-right:6px; white-space:nowrap; }
+  .dusk-cell{
+    width:18px; height:18px; border-radius:50%;
+    background:rgba(36,27,63,0.12);
+    border:1px solid rgba(36,27,63,0.2);
+  }
+  .dusk-cell.filled{ background: linear-gradient(135deg, var(--dusk-500), var(--dusk-900)); border-color:transparent; }
+
+  svg.board{ width:100%; height:auto; display:block; }
+
+  .tile-label{
+    font-size:9px; fill:var(--ink); opacity:.55; font-family:"Zen Kaku Gothic New", sans-serif;
+  }
+
+  .firefly-dot{ filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25)); }
+  .queen-dot{ filter: drop-shadow(0 0 6px rgba(255,209,102,0.9)); }
+  .twilight .queen-dot{ filter: drop-shadow(0 0 14px rgba(255,229,150,1)) drop-shadow(0 0 26px rgba(255,209,102,0.8)); }
+
+  .guardian-pin{ filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)); cursor:default; }
+
+  .reachable{ cursor:pointer; }
+  .reachable:hover circle.tile-base{ stroke:var(--coral); stroke-width:3; }
+
+  .hud{ display:flex; flex-direction:column; gap:14px; }
+  .player-card{
+    border-radius:14px; padding:10px 12px; display:flex; align-items:center; gap:10px;
+    border:2px solid transparent; background:rgba(255,255,255,0.6);
+  }
+  .player-card.active{ border-color: var(--coral); background:#fff; box-shadow:0 4px 12px rgba(242,121,92,0.25); }
+  .player-swatch{ width:16px; height:16px; border-radius:50%; flex:0 0 auto; }
+  .player-meta{ flex:1; font-size:.8rem; line-height:1.4; }
+  .player-meta b{ font-size:.9rem; }
+  .score-pill{ font-size:.75rem; background:var(--dusk-900); color:#fbf4e6; padding:2px 8px; border-radius:999px; }
+
+  .hand-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .hand-chip{
+    display:flex; align-items:center; gap:6px;
+    background:#fff; border-radius:999px; padding:5px 8px 5px 5px;
+    box-shadow:0 3px 8px rgba(36,27,63,0.15); font-size:.72rem;
+  }
+  .hand-chip .dot{ width:14px; height:14px; border-radius:50%; }
+  .hand-chip button{ border:none; background:var(--dusk-800); color:#fff; border-radius:999px; padding:3px 8px; font-size:.68rem; cursor:pointer; }
+  .hand-chip button.stock{ background:var(--teal); }
+  .hand-chip button:hover{ opacity:.85; }
+
+  .actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  button.act{
+    font-family:"Zen Kaku Gothic New", sans-serif;
+    border:none; border-radius:999px; padding:9px 16px; font-size:.82rem; cursor:pointer;
+    background: var(--coral); color:#fff; box-shadow:0 4px 10px rgba(242,121,92,0.35);
+  }
+  button.act.secondary{ background: var(--dusk-800); box-shadow:0 4px 10px rgba(63,50,112,0.3); }
+  button.act:disabled{ opacity:.35; cursor:not-allowed; box-shadow:none; }
+  button.act:hover:not(:disabled){ filter:brightness(1.06); }
+
+  .move-row{ display:flex; gap:6px; margin-top:6px; }
+
+  .log-panel{ max-height:150px; overflow-y:auto; font-size:.75rem; line-height:1.6; opacity:.85; }
+  .log-panel div{ border-bottom:1px dashed rgba(36,27,63,0.15); padding:3px 0; }
+
+  .stock-box{ font-size:.72rem; margin-top:8px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .stock-box .dot{ width:12px; height:12px; border-radius:50%; display:inline-block; }
+
+  .constellation-box{ font-size:.72rem; margin-top:6px; display:flex; gap:4px; flex-wrap:wrap; }
+  .constellation-box .dot{ width:10px; height:10px; border-radius:50%; }
+
+  .setup-panel{ display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+  .setup-panel select{ padding:6px 10px; border-radius:8px; border:1px solid rgba(36,27,63,0.25); font-family:inherit; }
+
+  .overlay{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column;
+    background:rgba(16,11,34,0.86); color:#fbf4e6; text-align:center; padding:24px; border-radius:18px; gap:10px;
+  }
+  .overlay h2{ color:var(--gold); text-shadow:0 0 18px rgba(255,209,102,0.7); }
+  .final-scores{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; margin-top:8px; }
+  .final-scores .fs-card{ background:rgba(255,255,255,0.08); border-radius:12px; padding:10px 16px; min-width:120px; }
+  .final-scores .fs-card b{ font-size:1.3rem; display:block; margin-top:4px; }
+
+  footer.note{ margin-top:22px; font-size:.72rem; opacity:.6; line-height:1.7; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script src="vendor/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useRef } = React;
+
+const TILE_COUNT = 14; // 0..12 = river, 13 = twilight pool (queen)
+const TRACK_LEN = 12;
+
+const FIREFLY_COLORS = [
+  { id: "gold", label: "こがねいろ", hex: "#ffd166" },
+  { id: "coral", label: "さんごいろ", hex: "#f2795c" },
+  { id: "mint", label: "もえぎいろ", hex: "#8bd17c" },
+  { id: "sky", label: "みずいろ", hex: "#6fb8f2" },
+];
+
+const PLAYER_COLORS = ["#f2795c", "#3fa796", "#f2c14e", "#8f7fd1"];
+const PLAYER_NAMES = ["せいれい・あか", "せいれい・みどり", "せいれい・きん", "せいれい・むらさき"];
+
+function makeBag() {
+  // 4色 x 10個
+  const bag = [];
+  FIREFLY_COLORS.forEach(c => { for (let i=0;i<10;i++) bag.push(c.id); });
+  return bag;
+}
+
+function drawFromBag(bag, n) {
+  const copy = [...bag];
+  const drawn = [];
+  for (let i=0;i<n && copy.length>0;i++){
+    const idx = Math.floor(Math.random()*copy.length);
+    drawn.push(copy.splice(idx,1)[0]);
+  }
+  return { drawn, remaining: copy };
+}
+
+function tilePositions() {
+  const pts = [];
+  for (let i=0;i<TILE_COUNT;i++){
+    const t = i/(TILE_COUNT-1);
+    const x = 40 + t*920;
+    const y = 210 + Math.sin(i*0.85) * 110 + (i===TILE_COUNT-1 ? -20 : 0);
+    pts.push({x,y});
+  }
+  return pts;
+}
+
+function colorHex(id){
+  return (FIREFLY_COLORS.find(c=>c.id===id) || {}).hex || "#ccc";
+}
+
+function scoreFor(player){
+  const counts = {};
+  player.constellation.forEach(c => counts[c] = (counts[c]||0)+1);
+  let total = 0;
+  Object.values(counts).forEach(n => { total += n>=3 ? n*2 : n*1; });
+  if (player.hasQueen) total += 5;
+  return total;
+}
+
+function App(){
+  const [numPlayers, setNumPlayers] = useState(3);
+  const [started, setStarted] = useState(false);
+  const [players, setPlayers] = useState([]);
+  const [bag, setBag] = useState(makeBag());
+  const [tiles, setTiles] = useState(() => Array.from({length:TILE_COUNT}, ()=>[]));
+  const [duskTrack, setDuskTrack] = useState(0);
+  const [twilight, setTwilight] = useState(false);
+  const [twilightTurnsLeft, setTwilightTurnsLeft] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const [hand, setHand] = useState([]);
+  const [log, setLog] = useState([]);
+  const [queenTaken, setQueenTaken] = useState(false);
+  const logEndRef = useRef(null);
+
+  const points = useMemo(tilePositions, []);
+
+  function pushLog(msg){
+    setLog(l => [...l.slice(-40), msg]);
+  }
+
+  function startGame(){
+    const ps = Array.from({length:numPlayers}, (_,i)=>({
+      id:i, name: PLAYER_NAMES[i], color: PLAYER_COLORS[i],
+      position:0, stock:[], constellation:[], hasQueen:false,
+    }));
+    setPlayers(ps);
+    setBag(makeBag());
+    setTiles(Array.from({length:TILE_COUNT}, ()=>[]));
+    setDuskTrack(0);
+    setTwilight(false);
+    setTwilightTurnsLeft(0);
+    setGameOver(false);
+    setCurrent(0);
+    setHand([]);
+    setLog(["ゲームを開始しました。たそがれが訪れる前に、ホタルを集めましょう。"]);
+    setQueenTaken(false);
+    setStarted(true);
+  }
+
+  function draw3(){
+    if (hand.length>0) return;
+    const {drawn, remaining} = drawFromBag(bag, 3);
+    setBag(remaining);
+    setHand(drawn);
+    pushLog(`${players[current].name} がホタルを${drawn.length}個引いた。`);
+  }
+
+  function placeOnTile(colorId){
+    const p = players[current];
+    const tileIdx = p.position;
+    setTiles(ts => {
+      const copy = ts.map(t=>[...t]);
+      if (copy[tileIdx].length >= 3) return ts; // リリーパッド上限
+      copy[tileIdx] = [...copy[tileIdx], colorId];
+      return copy;
+    });
+    setHand(h => { const i=h.indexOf(colorId); const c=[...h]; c.splice(i,1); return c; });
+    pushLog(`${p.name} が ${tileIdx+1}番目のマスにホタル(${colorId})を置いた。`);
+  }
+
+  function stockFirefly(colorId){
+    setPlayers(ps => ps.map((pl,i)=>{
+      if (i!==current) return pl;
+      if (pl.stock.length>=2) return pl;
+      return {...pl, stock:[...pl.stock, colorId]};
+    }));
+    setHand(h => { const i=h.indexOf(colorId); const c=[...h]; c.splice(i,1); return c; });
+    pushLog(`${players[current].name} がホタル(${colorId})を手元にストックした。`);
+  }
+
+  function move(steps){
+    setPlayers(ps => ps.map((pl,i)=>{
+      if (i!==current) return pl;
+      const newPos = Math.min(TILE_COUNT-1, pl.position + steps);
+      return {...pl, position:newPos};
+    }));
+    const p = players[current];
+    const newPos = Math.min(TILE_COUNT-1, p.position + steps);
+    pushLog(`${p.name} が ${steps}マス進み、${newPos+1}番目のマスに到着した。`);
+
+    setTiles(ts => {
+      const copy = ts.map(t=>[...t]);
+      if (copy[newPos].length>0){
+        const taken = copy[newPos][0];
+        copy[newPos] = copy[newPos].slice(1);
+        setPlayers(ps2 => ps2.map((pl2,i2)=> i2===current ? {...pl2, constellation:[...pl2.constellation, taken]} : pl2));
+        pushLog(`${p.name} がリリーパッドのホタル(${taken})を星座に取り込んだ。`);
+      }
+      return copy;
+    });
+
+    if (newPos === TILE_COUNT-1 && !queenTaken){
+      setQueenTaken(true);
+      setPlayers(ps => ps.map((pl,i)=> i===current ? {...pl, hasQueen:true} : pl));
+      pushLog(`✨ ${p.name} が「たそがれの淵」で女王ホタルを迎えた！`);
+    }
+  }
+
+  function endTurn(){
+    if (!twilight){
+      const next = duskTrack+1;
+      setDuskTrack(next);
+      if (next >= TRACK_LEN){
+        setTwilight(true);
+        setTwilightTurnsLeft(players.length);
+        pushLog("🌙 たそがれトラックが最後まで進んだ。最後の「たそがれラウンド」が始まる。");
+      }
+    } else {
+      const left = twilightTurnsLeft - 1;
+      setTwilightTurnsLeft(left);
+      if (left <= 0){
+        setGameOver(true);
+        pushLog("ゲーム終了。星座を数えましょう。");
+      }
+    }
+    setHand([]);
+    setCurrent(c => (c+1) % players.length);
+  }
+
+  if (!started){
+    return (
+      <div className="wrap">
+        <header className="app-header">
+          <div>
+            <div className="title">たそがれホタル</div>
+            <div className="subtitle">SALTY STUDIO 新作企画 / 簡易デジタルモック</div>
+          </div>
+        </header>
+        <div className="panel">
+          <h2 style={{marginBottom:10}}>プレイヤー人数を選んで開始</h2>
+          <div className="setup-panel">
+            <select value={numPlayers} onChange={e=>setNumPlayers(Number(e.target.value))}>
+              <option value={2}>2人</option>
+              <option value={3}>3人</option>
+              <option value={4}>4人</option>
+            </select>
+            <button className="act" onClick={startGame}>ゲームを始める</button>
+          </div>
+          <p style={{fontSize:".8rem", opacity:.75, lineHeight:1.7}}>
+            これはルール理解と盤面イメージ確認のための簡易モックです。得点条件（風カード）は省略し、
+            色ごとの並びによる基本得点と女王ホタルの加護のみで計算します。詳細は <code>../rules.md</code> を参照してください。
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const cur = players[current];
+
+  return (
+    <div className="wrap">
+      <header className="app-header">
+        <div>
+          <div className="title">たそがれホタル</div>
+          <div className="subtitle">SALTY STUDIO 新作企画 / 簡易デジタルモック</div>
+        </div>
+        <button className="act secondary" onClick={()=>setStarted(false)} style={{fontSize:".72rem"}}>リセット</button>
+      </header>
+
+      <div className="layout">
+        <div className={"panel board-panel" + (twilight ? " twilight" : "")}>
+          <div className="dusk-track">
+            <span className="label" style={{color: twilight? "#fbf4e6":"var(--ink)"}}>たそがれトラック</span>
+            {Array.from({length:TRACK_LEN}).map((_,i)=>(
+              <div key={i} className={"dusk-cell" + (i<duskTrack ? " filled":"")}></div>
+            ))}
+            {twilight && !gameOver && <span style={{marginLeft:8,fontSize:".72rem",color:"#ffd166"}}>たそがれラウンド（残り{twilightTurnsLeft}手番）</span>}
+          </div>
+
+          <svg className="board" viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d={"M " + points.map(p=>`${p.x} ${p.y}`).join(" L ")}
+              fill="none"
+              stroke={twilight ? "#4a3f7a" : "#bcd9e6"}
+              strokeWidth="26"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.6"
+            />
+            {points.map((p,i)=>{
+              const isReachable = (!gameOver) && (i > cur.position) && (i <= cur.position+3) && hand.length===0;
+              const fireflies = tiles[i];
+              return (
+                <g key={i} className={isReachable ? "reachable" : ""} onClick={()=> isReachable && move(i-cur.position)}>
+                  <circle className="tile-base" cx={p.x} cy={p.y} r={i===TILE_COUNT-1 ? 26 : 20}
+                    fill={i===TILE_COUNT-1 ? "#241b3f" : (twilight ? "#392e5c" : "#fff9ec")}
+                    stroke={isReachable ? "#f2795c" : (twilight ? "#5c4b98" : "#d8c9a3")}
+                    strokeWidth={isReachable ? 3 : 1.5}
+                  />
+                  {i===TILE_COUNT-1 && (
+                    <circle className="queen-dot" cx={p.x} cy={p.y} r="9" fill="#ffd166" opacity={queenTaken? 0.35 : 1} />
+                  )}
+                  {fireflies.map((c,fi)=>{
+                    const angle = (fi/3) * Math.PI*2;
+                    const fx = p.x + Math.cos(angle)*11;
+                    const fy = p.y + Math.sin(angle)*11 + 12;
+                    return <circle key={fi} className="firefly-dot" cx={fx} cy={fy} r="5" fill={colorHex(c)} />;
+                  })}
+                  <text className="tile-label" x={p.x} y={p.y+34} textAnchor="middle"
+                    fill={twilight ? "#cbb8f0" : "var(--ink)"}>{i+1}</text>
+                </g>
+              );
+            })}
+
+            {players.map((pl,i)=>{
+              const p = points[pl.position];
+              const offset = (i - (players.length-1)/2) * 10;
+              return (
+                <g key={i} transform={`translate(${p.x+offset}, ${p.y-26})`}>
+                  <path className="guardian-pin" d="M0,-16 L8,4 L-8,4 Z" fill={pl.color} />
+                  <circle cx="0" cy="-16" r="6" fill={pl.color} stroke="#fff" strokeWidth="1.5"/>
+                </g>
+              );
+            })}
+          </svg>
+
+          {twilight && !gameOver && (
+            <p style={{fontSize:".78rem", color:"#e7dcff", marginTop:4}}>
+              🌌 部屋の明かりを少し落として、女王ホタルの光を確かめながら最後の手番を進めましょう。
+            </p>
+          )}
+
+          {gameOver && (
+            <div className="overlay">
+              <h2>たそがれ、深まる</h2>
+              <p style={{fontSize:".85rem", opacity:.85}}>今夜の星座が出そろいました。</p>
+              <div className="final-scores">
+                {[...players].sort((a,b)=>scoreFor(b)-scoreFor(a)).map(pl=>(
+                  <div key={pl.id} className="fs-card">
+                    <span style={{color:pl.color}}>{pl.name}{pl.hasQueen ? " 👑" : ""}</span>
+                    <b>{scoreFor(pl)}点</b>
+                  </div>
+                ))}
+              </div>
+              <button className="act" style={{marginTop:14}} onClick={()=>setStarted(false)}>もう一度セットアップへ</button>
+            </div>
+          )}
+        </div>
+
+        <div className="hud">
+          <div className="panel">
+            <h3 style={{fontSize:"1rem", marginBottom:8}}>プレイヤー</h3>
+            {players.map((pl,i)=>(
+              <div key={pl.id} className={"player-card" + (i===current && !gameOver ? " active":"")} style={{marginBottom:6}}>
+                <div className="player-swatch" style={{background:pl.color}}></div>
+                <div className="player-meta">
+                  <b>{pl.name}{pl.hasQueen ? " 👑":""}</b><br/>
+                  マス {pl.position+1} / {TILE_COUNT}
+                  <div className="constellation-box">
+                    {pl.constellation.map((c,ci)=><span key={ci} className="dot" style={{background:colorHex(c)}}></span>)}
+                  </div>
+                  <div className="stock-box">
+                    ストック:
+                    {pl.stock.length===0 && <span style={{opacity:.5}}>なし</span>}
+                    {pl.stock.map((c,si)=><span key={si} className="dot" style={{background:colorHex(c)}}></span>)}
+                  </div>
+                </div>
+                <span className="score-pill">{scoreFor(pl)}点</span>
+              </div>
+            ))}
+          </div>
+
+          {!gameOver && (
+            <div className="panel">
+              <h3 style={{fontSize:"1rem"}}>{cur.name} の手番</h3>
+
+              <button className="act" disabled={hand.length>0} onClick={draw3}>ホタルを3つ引く</button>
+
+              {hand.length>0 && (
+                <div className="hand-row">
+                  {hand.map((c,i)=>(
+                    <div key={i} className="hand-chip">
+                      <span className="dot" style={{background:colorHex(c)}}></span>
+                      <button onClick={()=>placeOnTile(c)}>マスに置く</button>
+                      <button className="stock" onClick={()=>stockFirefly(c)}>ストック</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="move-row">
+                {[1,2,3].map(n=>(
+                  <button key={n} className="act secondary" disabled={hand.length>0 || cur.position>=TILE_COUNT-1}
+                    onClick={()=>move(n)}>{n}マス進む</button>
+                ))}
+              </div>
+
+              <div className="actions">
+                <button className="act" onClick={endTurn}>ターンを終了する</button>
+              </div>
+            </div>
+          )}
+
+          <div className="panel">
+            <h3 style={{fontSize:"1rem", marginBottom:6}}>ログ</h3>
+            <div className="log-panel">
+              {log.map((l,i)=><div key={i}>{l}</div>)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer className="note">
+        本モックは企画検証用の簡易版です。風カードによる得点条件変化・女王ホタルの詳細ボーナスなど、
+        一部ルールは省略しています（詳細は <code>../rules.md</code> / <code>../log.md</code> Phase5 参照）。
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
