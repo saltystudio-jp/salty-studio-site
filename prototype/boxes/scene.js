@@ -117,10 +117,16 @@
     this.scene = new THREE.Scene();
     this.scene.background = null;
 
-    this.camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
-    this.camBase = new THREE.Vector3(0, 5.4, 9.4);
-    this.camTargetX = 0;
-    this.camCurrentX = 0;
+    // Boxes stand in a column along Z (reads as a vertical list on screen);
+    // the camera sits off to +X and tracks the selected box's Z position.
+    // Opening a box pans the whole rig sideways in Z to reveal the content
+    // space (see _tick): that direction reads as "right" on screen from here.
+    this.camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+    this.camBase = new THREE.Vector3(11.5, 6.4, 0);
+    this.camTargetZ = 0;
+    this.camCurrentZ = 0;
+    this.panTarget = 0;
+    this.panCurrent = 0;
     this.lookAt = new THREE.Vector3(0, 1.1, 0);
     this.mouseNorm = { x: 0, y: 0 };
     this.parallax = { x: 0, y: 0 };
@@ -200,34 +206,37 @@
     }
   };
 
+  var COLUMN_X = -0.4; // boxes sit slightly left so the pan-right reveal has room
+
   BoxScene.prototype.buildGames = function (games) {
     var self = this;
-    var gap = 0.9;
-    var x = 0;
+    var gap = 1.5;
+    var z = 0;
     var positions = [];
     games.forEach(function (game, i) {
       var d = DIMS[game.id];
-      if (i > 0) x += d.w / 2 + gap / 2 + positions[i - 1].halfW;
-      positions.push({ x: x, halfW: d.w / 2 });
+      if (i > 0) z += d.d / 2 + gap / 2 + positions[i - 1].halfD;
+      positions.push({ z: z, halfD: d.d / 2 });
     });
-    var total = positions.length ? positions[positions.length - 1].x : 0;
+    var total = positions.length ? positions[positions.length - 1].z : 0;
     var offset = total / 2;
 
     games.forEach(function (game, i) {
       var d = DIMS[game.id];
-      var baseX = positions[i].x - offset;
-      var entry = self._buildOne(game, d, baseX, i);
+      var baseZ = positions[i].z - offset;
+      var entry = self._buildOne(game, d, baseZ, i);
       self.games.push(entry);
     });
 
     this.activeIndex = 0;
-    this.camTargetX = this.games.length ? this.games[0].baseX : 0;
-    this.camCurrentX = this.camTargetX;
+    this.camTargetZ = this.games.length ? this.games[0].baseZ : 0;
+    this.camCurrentZ = this.camTargetZ;
   };
 
-  BoxScene.prototype._buildOne = function (game, d, baseX, index) {
+  BoxScene.prototype._buildOne = function (game, d, baseZ, index) {
     var group = new THREE.Group();
-    group.position.set(baseX, 0, 0);
+    group.position.set(COLUMN_X, 0, baseZ);
+    group.rotation.y = Math.PI / 2; // face the boxes toward +X, where the camera sits
     this.scene.add(group);
 
     var bodyH = d.h - LID_T;
@@ -285,21 +294,14 @@
       var visibleCount = Math.max(1, Math.min(g.qty, maxShow, imgCount || maxShow));
       return { g: g, isToken: isToken, visibleCount: visibleCount };
     });
-    var gapBetweenGroups = 0.35;
-    var groupWidths = plannedGroups.map(function (p) {
-      var pw = p.isToken ? 0.42 : 0.56;
-      return (p.visibleCount - 1) * (pw * 0.72) + pw;
-    });
-    var totalW = groupWidths.reduce(function (s, w) { return s + w; }, 0) + gapBetweenGroups * Math.max(0, groupWidths.length - 1);
-    var cursorX = -totalW / 2;
-
+    // Each component group becomes its own row, laid out at increasing
+    // popOut distance (see "open" below) rather than one continuous fan, so
+    // the revealed space reads as tidy rows instead of a diagonal cascade.
     plannedGroups.forEach(function (plan, gi) {
       var g = plan.g, isToken = plan.isToken, visibleCount = plan.visibleCount;
       var pw = isToken ? 0.42 : 0.56, ph = isToken ? 0.42 : 0.78;
-      var groupW = groupWidths[gi];
-      var groupCenter = cursorX + groupW / 2;
-      cursorX += groupW + gapBetweenGroups;
-      var spread = visibleCount > 1 ? groupW / (visibleCount - 1) * 0.86 : 0;
+      var groupCenter = 0;
+      var spread = visibleCount > 1 ? (isToken ? 0.34 : 0.46) : 0;
 
       for (var i = 0; i < visibleCount; i++) {
         var geo = isToken
@@ -318,11 +320,14 @@
         mesh.castShadow = true;
         mesh.receiveShadow = true;
 
-        var px = groupCenter + (i - (visibleCount - 1) / 2) * spread;
-        var pz = d.d * 0.32 + gi * 0.05;
+        // Local +X maps (after the box group's 90° yaw) to world -Z, which is
+        // the direction the camera pans toward on open — so pieces travel in
+        // local X to land in the space the pan reveals, fanned along local Z.
+        var fanOffset = groupCenter + (i - (visibleCount - 1) / 2) * spread;
+        var popOut = 0.68 + gi * 0.4;
         var rotY = (Math.random() - 0.5) * 0.5;
         var closed = { x: 0, y: bodyH * 0.55, z: 0, ry: 0, s: 0.22 };
-        var open = { x: px, y: 0.03, z: pz, ry: rotY, s: 1 };
+        var open = { x: popOut, y: 0.03, z: fanOffset, ry: rotY, s: 1 };
 
         mesh.position.set(closed.x, closed.y, closed.z);
         mesh.scale.setScalar(closed.s);
@@ -340,7 +345,7 @@
     }, this);
 
     return {
-      id: game.id, baseX: baseX, group: group, body: body, lidPivot: lidPivot,
+      id: game.id, baseZ: baseZ, group: group, body: body, lidPivot: lidPivot,
       pieces: pieces, dims: d,
       state: { lift: 0, forward: 0, lidOpen: 0, openT0: 0 },
       phase: "closed",
@@ -350,7 +355,7 @@
   BoxScene.prototype.select = function (index) {
     this.activeIndex = index;
     var g = this.games[index];
-    if (g) this.camTargetX = g.baseX;
+    if (g) this.camTargetZ = g.baseZ;
     this.games.forEach(function (entry, i) {
       entry.liftTarget = i === index ? 1 : 0;
     });
@@ -361,12 +366,14 @@
     if (!g) return;
     g.phase = "open";
     g.state.openT0 = performance.now();
+    this.panTarget = 1;
   };
 
   BoxScene.prototype.close = function (index) {
     var g = this.games[index];
     if (!g) return;
     g.phase = "closed";
+    this.panTarget = 0;
   };
 
   BoxScene.prototype._tick = function (now) {
@@ -375,15 +382,20 @@
     var k = this.reduceMotion ? 60 : 9;
     var kLid = this.reduceMotion ? 60 : 5;
 
-    this.camCurrentX = damp(this.camCurrentX, this.camTargetX, 7, dt);
-    this.parallax.x = damp(this.parallax.x, this.mouseNorm.x * 0.5, 4, dt);
+    this.camCurrentZ = damp(this.camCurrentZ, this.camTargetZ, 7, dt);
+    this.panCurrent = damp(this.panCurrent, this.panTarget || 0, this.reduceMotion ? 60 : 5.5, dt);
+    this.parallax.x = damp(this.parallax.x, this.mouseNorm.x * 0.35, 4, dt);
     this.parallax.y = damp(this.parallax.y, this.mouseNorm.y * 0.22, 4, dt);
+    // Panning right on screen, from this camera's side-on angle, means
+    // translating the whole rig toward world -Z — shift camera and lookAt
+    // together so it reads as a lateral pan, not a reframing.
+    var panZ = -this.panCurrent * 2.1;
     this.camera.position.set(
-      this.camBase.x + this.camCurrentX + this.parallax.x,
+      this.camBase.x + this.parallax.x,
       this.camBase.y - this.parallax.y,
-      this.camBase.z
+      this.camBase.z + this.camCurrentZ + panZ
     );
-    this.camera.lookAt(this.camCurrentX, this.lookAt.y, this.lookAt.z);
+    this.camera.lookAt(this.lookAt.x, this.lookAt.y, this.camCurrentZ + panZ);
 
     for (var gi = 0; gi < this.games.length; gi++) {
       var entry = this.games[gi];
@@ -392,7 +404,7 @@
       st.lift = damp(st.lift, liftT, k, dt);
       st.forward = damp(st.forward, liftT, k, dt);
       entry.group.position.y = st.lift * 0.12;
-      entry.group.position.z = st.forward * 0.4;
+      entry.group.position.x = COLUMN_X + st.forward * 0.35;
       var scale = 1 + st.lift * 0.04;
       entry.group.scale.setScalar(scale);
 
