@@ -22,7 +22,10 @@
 
 <main>
   <section class="stage" id="stage" aria-label="ゲーム箱をえらぶステージ">
-    <div class="stage-3d" id="stage3d" role="listbox" aria-label="作品一覧"></div>
+    <canvas id="scene3d" aria-hidden="true"></canvas>
+    <div class="stage-fallback" id="stageFallback" hidden>
+      <p>このブラウザでは3D表示を利用できないため、簡易表示にしています。</p>
+    </div>
     <button class="nav-arrow nav-prev" id="navPrev" aria-label="前の作品">‹</button>
     <button class="nav-arrow nav-next" id="navNext" aria-label="次の作品">›</button>
   </section>
@@ -53,7 +56,9 @@
   <p>このページはJavaScriptによる操作を前提としたプロトタイプです。JavaScriptを有効にしてご覧ください。各作品の情報は <a href="/games/">ゲーム一覧ページ</a> でも確認できます。</p>
 </noscript>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="./data.js"></script>
+<script src="./scene.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>
